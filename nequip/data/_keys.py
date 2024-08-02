@@ -61,6 +61,9 @@ PARTIAL_FORCE_KEY: Final[str] = "partial_forces"
 STRESS_KEY: Final[str] = "stress"
 VIRIAL_KEY: Final[str] = "virial"
 
+# magres related keys
+MAGRES_KEY: Final[str] = "magres"
+
 ALL_ENERGY_KEYS: Final[List[str]] = [
     EDGE_ENERGY_KEY,
     PER_ATOM_ENERGY_KEY,

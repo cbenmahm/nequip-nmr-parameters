@@ -1,4 +1,4 @@
-from ._eng import EnergyModel, SimpleIrrepsConfig
+from ._eng import EnergyModel, SimpleIrrepsConfig, MagResTensorModel
 from ._grads import ForceOutput, PartialForceOutput, StressForceOutput
 from ._scaling import RescaleEnergyEtc, PerSpeciesRescale
 from ._weight_init import (
@@ -16,6 +16,7 @@ from . import builder_utils
 __all__ = [
     SimpleIrrepsConfig,
     EnergyModel,
+    MagResTensorModel,
     ForceOutput,
     PartialForceOutput,
     StressForceOutput,

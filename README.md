@@ -1,5 +1,22 @@
 # NequIP
 
+
+## NequIP for anisotropic NMR parameters
+This repository contains the code supporting:
+
+<div align="center">
+
+> **[Graph-neural-network predictions of solid-state NMR parameters from spherical tensor decomposition](https://arxiv.org/abs/2412.15063)**\
+> _Chiheb Ben Mahmoud, Louise A. M. Rosset, Jonathan R. Yates, and Volker L. Deringer_
+
+</div>
+
+To install the code, you can simply use : `pip install .`
+
+We only tested the implementation with `torch` version 1.13.1
+
+## README of the original NequIP
+
 NequIP is an open-source code for building E(3)-equivariant interatomic potentials.
 
 [![Documentation Status](https://readthedocs.org/projects/nequip/badge/?version=latest)](https://nequip.readthedocs.io/en/latest/?badge=latest)

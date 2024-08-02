@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional
 from torch_runstats.scatter import scatter
 
-from e3nn.o3 import Linear
+from e3nn.o3 import Linear, FullTensorProduct, Irreps, FullyConnectedTensorProduct
 
 from nequip.data import AtomicDataDict
 from nequip.data.transforms import TypeMapper
@@ -111,6 +111,59 @@ class AtomwiseReduce(GraphModuleMixin, torch.nn.Module):
         if self.constant != 1.0:
             result = result * self.constant
         data[self.out_field] = result
+        return data
+
+
+class AtomwiseTP(GraphModuleMixin, torch.nn.Module):
+    def __init__(
+        self,
+        field: str = AtomicDataDict.NODE_FEATURES_KEY,
+        out_field: Optional[str] = None,
+        irreps_in=None,
+        irreps_out=None,
+        hidden_tp=None,
+        is_l1=None,
+    ):
+        super().__init__()
+        self.field = field
+        out_field = out_field if out_field is not None else field
+        self.out_field = out_field
+        if irreps_out is None:
+            irreps_out = irreps_in[field]
+
+        self._init_irreps(
+            irreps_in=irreps_in,
+            required_irreps_in=[field],
+            irreps_out={out_field: irreps_out},
+        )
+        self.hidden_tp = hidden_tp
+        self.linear = Linear(
+            # irreps_in=self.irreps_in[field], irreps_out=self.irreps_out[out_field]
+            irreps_in=self.irreps_in[field],
+            irreps_out=self.hidden_tp,
+        )
+        self.hidden_tp = Irreps(self.hidden_tp)
+        self.tp_num = self.hidden_tp.num_irreps // 2
+        self.max_order = list(*self.hidden_tp)[-1]
+        # self.rhs = self.hidden_tp.dim // 2
+        if is_l1:
+            # self.tp = FullTensorProduct("1o", "1o", [Irrep("1e")])
+            self.tp = FullyConnectedTensorProduct(
+                f"{self.tp_num}x{self.max_order}",
+                f"{self.tp_num}x{self.max_order}",
+                irreps_out="1e",
+            )
+        else:
+            # self.tp = FullTensorProduct("1o", "1o")
+            self.tp = FullyConnectedTensorProduct(
+                f"{self.tp_num}x{self.max_order}",
+                f"{self.tp_num}x{self.max_order}",
+                irreps_out="0e+1e+2e",
+            )
+
+    def forward(self, data: AtomicDataDict.Type) -> AtomicDataDict.Type:
+        x = self.linear(data[self.field])
+        data[self.out_field] = self.tp(x[:, : x.shape[1] // 2], x[:, x.shape[1] // 2 :])
         return data
 
 

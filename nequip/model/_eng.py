@@ -8,6 +8,7 @@ from nequip.nn import (
     SequentialGraphNetwork,
     AtomwiseLinear,
     AtomwiseReduce,
+    AtomwiseTP,
     ConvNetLayer,
 )
 from nequip.nn.embedding import (
@@ -134,6 +135,84 @@ def EnergyModel(
         ),
     )
 
+    return SequentialGraphNetwork.from_parameters(
+        shared_params=config,
+        layers=layers,
+    )
+
+
+def MagResTensorModel(
+    config, initialize: bool, dataset: Optional[AtomicDataset] = None
+) -> SequentialGraphNetwork:
+    """MagRes Tensor model archetecture.
+
+    For minimal and full configuration option listings, see ``minimal.yaml`` and ``example.yaml``.
+    """
+    logging.debug("Start building the network model")
+
+    builder_utils.add_avg_num_neighbors(
+        config=config, initialize=initialize, dataset=dataset
+    )
+
+    num_layers = config.get("num_layers", 3)
+
+    irreps_out = config.get("irreps_out")
+    hidden_tp = config.get("hidden_tp", None)
+    assert irreps_out in ["0e", "1e", "2e", "full", "tp", "tp_l1", "0e+1e+2e"]
+    if irreps_out == "tp":
+        irreps_out = "2x1o"
+        is_l1 = False
+    elif irreps_out == "tp_l1":
+        irreps_out = "2x1o"
+        is_l1 = True
+    elif irreps_out == "full":
+        irreps_out = "0e+1e+2e"
+
+    layers = {
+        # -- Encode --
+        "one_hot": OneHotAtomEncoding,
+        "spharm_edges": SphericalHarmonicEdgeAttrs,
+        "radial_basis": RadialBasisEdgeEncoding,
+        # -- Embed features --
+        "chemical_embedding": AtomwiseLinear,
+    }
+
+    # add convnet layers
+    # insertion preserves order
+    for layer_i in range(num_layers):
+        layers[f"layer{layer_i}_convnet"] = ConvNetLayer
+
+    if irreps_out == "2x1o":
+        layers.update(
+            {
+                # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
+                # -- output block --
+                # "conv_to_output_hidden": (AtomwiseLinear, dict(irreps_out=irreps_out)),
+                "conv_to_output_hidden": AtomwiseLinear,
+                "output_hidden_to_vector": (
+                    AtomwiseTP,
+                    dict(
+                        irreps_out=irreps_out,
+                        out_field=AtomicDataDict.MAGRES_KEY,
+                        is_l1=is_l1,
+                        hidden_tp=hidden_tp,
+                    ),
+                ),
+            }
+        )
+    else:
+        # .update also maintains insertion order
+        layers.update(
+            {
+                # TODO: the next linear throws out all L > 0, don't create them in the last layer of convnet
+                # -- output block --
+                "conv_to_output_hidden": AtomwiseLinear,
+                "output_hidden_to_scalar": (
+                    AtomwiseLinear,
+                    dict(irreps_out=irreps_out, out_field=AtomicDataDict.MAGRES_KEY),
+                ),
+            }
+        )
     return SequentialGraphNetwork.from_parameters(
         shared_params=config,
         layers=layers,
